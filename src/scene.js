@@ -229,7 +229,7 @@ export function createStage(canvas, onSquare) {
     camera.right = halfWidth;
     camera.top = halfWidth / aspect;
     camera.bottom = -halfWidth / aspect;
-    camera.position.set(0, 11.6, flipped ? -15 : 15);
+    camera.position.set(0, 26, flipped ? -15 : 15);
     camera.lookAt(0, 0.1, 0);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
