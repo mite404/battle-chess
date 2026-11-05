@@ -227,14 +227,18 @@ async function executeMove(input) {
     $("#battle-subtitle").textContent =
       `${names[move.piece]} takes ${names[move.captured].toLowerCase()} · ${move.san}`;
     $("#battle-banner").hidden = false;
+    $("#flip").disabled = true;
+    $("#squares").inert = true;
     $("#status").textContent = battles[move.piece][0];
     $("#instruction").textContent = battles[move.piece][1];
     sound("battle", move.piece);
   } else sound("move");
-  await stage.animateMove(move, move.captured && animateBattles ? 3000 : 360, () =>
+  await stage.animateMove(move, move.captured && animateBattles ? 4200 : 360, () =>
     sound("impact", move.piece),
   );
   $("#battle-banner").hidden = true;
+  $("#flip").disabled = false;
+  $("#squares").inert = false;
   phase = "ready";
   lastMove = [move.from, move.to];
   refresh();
@@ -342,6 +346,7 @@ $("#hint").onclick = () => {
   );
 };
 $("#flip").onclick = () => stage.flip();
+$("#skip-battle").onclick = () => stage.skipBattle();
 $("#sound").onclick = () => {
   unlockAudio();
   soundEnabled = !soundEnabled;
@@ -396,7 +401,7 @@ $("#how").onclick = () =>
   );
 $("#settings").onclick = () => {
   modal(
-    `<h2>Game settings</h2><label class="setting-row">Capture animations <input id="animations" type="checkbox" ${animateBattles ? "checked" : ""}></label><p>Captures last three seconds. Reduced-motion preferences turn them off by default.</p><label class="setting-row">Load a position <input id="fen" placeholder="Paste a FEN position" aria-label="FEN position"></label><div class="dialog-actions"><button id="load-fen" class="gold-button">Load position</button></div><p id="fen-error" role="alert"></p>`,
+    `<h2>Game settings</h2><label class="setting-row">Capture animations <input id="animations" type="checkbox" ${animateBattles ? "checked" : ""}></label><p>Cinematic duels last about four seconds. Skip or press Escape to return to the board. Reduced-motion preferences turn them off by default.</p><label class="setting-row">Load a position <input id="fen" placeholder="Paste a FEN position" aria-label="FEN position"></label><div class="dialog-actions"><button id="load-fen" class="gold-button">Load position</button></div><p id="fen-error" role="alert"></p>`,
   );
   $("#animations").onchange = (event) => {
     animateBattles = event.target.checked;
@@ -435,6 +440,10 @@ $("#modal").addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    if (phase === "animating") {
+      stage.skipBattle();
+      return;
+    }
     selected = null;
     stage.highlight(null, [], lastMove);
   }

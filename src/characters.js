@@ -26,7 +26,20 @@ function grain(kind) {
       ctx.fillRect(x, y, 1, 1);
     }
   }
+  if (kind === "marble") {
+    ctx.fillStyle = "#f8f7f3";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = "#686e7928";
+    for (let i = 0; i < 7; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 23, 0);
+      ctx.bezierCurveTo(i * 23 - 40, 48, i * 23 + 35, 80, i * 23 - 25, 128);
+      ctx.lineWidth = i % 2 ? 0.5 : 1.2;
+      ctx.stroke();
+    }
+  }
   const texture = new THREE.CanvasTexture(canvas);
+  if (kind === "marble") texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(kind === "cloth" ? 3 : 2, 3);
   textures.set(kind, texture);
@@ -47,6 +60,29 @@ function surface(color, kind = "cloth") {
         bumpScale: metal ? 0.002 : 0.009,
       }),
     );
+  }
+  return surfaces.get(key);
+}
+
+function carvedSurface(original, ivory) {
+  const color = original.color.getHex();
+  const trim = color === gold;
+  const jewel = color === 0x25675b || color === 0xc64c32;
+  const shadow = [0x292b27, 0x111311, 0x171c19, 0x172125, 0x303c40].includes(color);
+  const key = `carved-${ivory}-${trim}-${jewel}-${shadow}-${original.side}`;
+  if (!surfaces.has(key)) {
+    const base = new THREE.Color(trim ? (ivory ? 0xc39a46 : 0x9eaab8)
+      : jewel ? (ivory ? 0x315a60 : 0x7f2632)
+      : shadow ? (ivory ? 0x686f76 : 0x10161e) : ivory ? 0xcfcabd : 0x252c36);
+    surfaces.set(key, new THREE.MeshStandardMaterial({
+      color: base,
+      metalness: trim ? 0.82 : 0.08,
+      roughness: trim ? 0.24 : ivory ? 0.34 : 0.27,
+      map: trim || jewel ? null : grain("marble"),
+      bumpMap: grain("stone"),
+      bumpScale: 0.003,
+      side: original.side,
+    }));
   }
   return surfaces.get(key);
 }
@@ -359,7 +395,7 @@ function batch(joint, joints) {
   }
 }
 
-/** Creates an original medieval figure with independent body, weapon-arm, and golem joints. */
+/** Creates a carved ivory or obsidian figure with independent body, weapon-arm, and golem joints. */
 export function createCharacter(type, color) {
   const root = new THREE.Group(),
     body = new THREE.Group(),
@@ -369,6 +405,10 @@ export function createCharacter(type, color) {
   const dark = ivory ? 0x827756 : 0x380e19;
   const gem = ivory ? 0x25675b : 0xc64c32;
   root.add(body);
+  body.position.y = 0.1;
+  const profile = [[0, 0], [0.29, 0], [0.33, 0.025], [0.33, 0.055],
+    [0.29, 0.075], [0.27, 0.1], [0, 0.1]].map(([x, y]) => new THREE.Vector2(x, y));
+  part(root, new THREE.LatheGeometry(profile, 48), cloth, [0, 0, 0], [1, 1, 1], "stone");
   const joints = [root, body, arm];
   ring(root, gold, [0, 0.025, 0], 0.31, 0.012);
   if (type === "r") {
@@ -638,6 +678,9 @@ export function createCharacter(type, color) {
   root.userData.type = type;
   root.userData.color = color;
   root.rotation.y = ivory ? Math.PI : 0;
+  root.traverse((item) => {
+    if (item.isMesh) item.material = carvedSurface(item.material, ivory);
+  });
   for (const joint of joints) batch(joint, joints);
   return root;
 }

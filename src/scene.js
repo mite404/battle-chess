@@ -1,9 +1,11 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createCharacter } from "./characters.js";
 
 const gold = 0xb99a53;
 const materials = new Map();
 const v = (x, y, z) => new THREE.Vector3(x, y, z);
+const ramp = (t, from, to) => THREE.MathUtils.smoothstep(t, from, to);
 
 function material(color, metalness = 0.15) {
   const key = `${color}-${metalness}`;
@@ -78,14 +80,20 @@ export function createStage(canvas, onSquare) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 0.95;
   const scene = new THREE.Scene();
+  const environment = new RoomEnvironment();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(environment).texture;
+  scene.environmentIntensity = 0.5;
+  environment.dispose();
+  pmrem.dispose();
   const camera = new THREE.OrthographicCamera(-7, 7, 6, -6, 0.1, 100);
   let flipped = false;
   const court = new THREE.Group();
   scene.add(court);
   scene.add(new THREE.HemisphereLight(0xdce2e8, 0x352c23, 1.5));
-  const sun = new THREE.DirectionalLight(0xffe1b4, 3.6);
+  const sun = new THREE.DirectionalLight(0xffe1b4, 2.8);
   sun.position.set(-3, 9, 5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -170,6 +178,13 @@ export function createStage(canvas, onSquare) {
   const pieces = new Map();
   const markers = new THREE.Group();
   court.add(markers);
+  const effects = new THREE.Group();
+  scene.add(effects);
+  const debrisMaterials = [0x353d47, 0xe2dbca].map(
+    (color) => new THREE.MeshBasicMaterial({ color }),
+  );
+  const impactLight = new THREE.PointLight(0xffd693, 0, 5);
+  scene.add(impactLight);
   const squarePosition = (square) => v(square.charCodeAt(0) - 100.5, 0.12, 4.5 - Number(square[1]));
   const buttons = new Map();
   const overlay = document.querySelector("#squares");
@@ -202,6 +217,7 @@ export function createStage(canvas, onSquare) {
   let animation = null;
   let dirty = true;
   let lastFrame = 0;
+  let renderedAt = null;
   function resize() {
     dirty = true;
     const width = canvas.clientWidth,
@@ -294,10 +310,17 @@ export function createStage(canvas, onSquare) {
       const attacker = pieces.get(move.from);
       const victimSquare = move.flags.includes("e") ? `${move.to[0]}${move.from[1]}` : move.to;
       const victim = pieces.get(victimSquare);
+      const cinematic = Boolean(victim && duration > 1000);
+      const direction = squarePosition(victimSquare).sub(squarePosition(move.from)).normalize();
+      const endpoint = squarePosition(victimSquare).addScaledVector(direction, -1.25);
       animation = {
         move,
         attacker,
         victim,
+        cinematic,
+        direction,
+        endpoint,
+        victimPosition: squarePosition(victimSquare),
         from: squarePosition(move.from),
         to: squarePosition(move.to),
         start: performance.now(),
@@ -305,16 +328,46 @@ export function createStage(canvas, onSquare) {
         resolve,
         onImpact,
         impacted: false,
+        cameraPosition: camera.position.clone(),
+        halfWidth: camera.right,
       };
-      if (victim)
+      if (cinematic) {
+        for (const piece of pieces.values())
+          piece.visible = piece === attacker || piece === victim;
         attacker.rotation.y = Math.atan2(
           victim.position.x - attacker.position.x,
           victim.position.z - attacker.position.z,
         );
+        victim.rotation.y = attacker.rotation.y + Math.PI;
+        const victimCenter = victim.position.clone().add(v(0, 0.8, 0));
+        impactLight.position.copy(victimCenter);
+        // Fixed trajectories keep debris deterministic and independent of the render frame rate.
+        for (let i = 0; i < 28; i++) {
+          const angle = i * 2.39996;
+          const fragment = new THREE.Mesh(
+            new THREE.TetrahedronGeometry(0.035 + (i % 5) * 0.014),
+            debrisMaterials[move.color === "w" ? 0 : 1],
+          );
+          fragment.userData.velocity = v(
+            Math.cos(angle) * (0.65 + (i % 4) * 0.3),
+            1.8 + (i % 6) * 0.32,
+            Math.sin(angle) * (0.65 + (i % 4) * 0.3),
+          );
+          fragment.visible = false;
+          effects.add(fragment);
+        }
+      }
     });
   }
   function tick(now) {
     requestAnimationFrame(tick);
+    // Lower pixel fill only when the preceding draw stalls, preserving detail on faster GPUs.
+    // ponytail: resolution only drops; add recovery if transient stalls blur otherwise-fast GPUs.
+    if (renderedAt !== null && now - renderedAt > 100 && renderer.getPixelRatio() > 0.75) {
+      renderer.setPixelRatio(Math.max(0.75, renderer.getPixelRatio() / 2));
+      dirty = true;
+    }
+    renderedAt = null;
     if ((!animation && !dirty) || now - lastFrame < 1000 / 30) return;
     lastFrame = now;
     if (animation) {
@@ -322,38 +375,73 @@ export function createStage(canvas, onSquare) {
       const t = Math.min(1, (now - a.start) / a.duration);
       const attacker = a.attacker;
       if (attacker) {
-        if (a.victim) {
-          const approach = Math.min(1, t / 0.27);
-          const endpoint = a.to.clone().lerp(a.from, 0.24);
-          attacker.position.lerpVectors(a.from, endpoint, approach);
-          const action = Math.max(0, Math.min(1, (t - 0.29) / 0.35));
-          const swing = Math.sin(action * Math.PI);
+        if (a.cinematic) {
+          const approach = ramp(t, 0, 0.19);
+          const windup = ramp(t, 0.2, 0.4);
+          const strike = ramp(t, 0.4, 0.48);
+          const recover = ramp(t, 0.56, 0.74);
+          const swing = windup * (1 - recover);
           const type = a.move.piece;
+          const magic = type === "q" || type === "b";
+          attacker.position.lerpVectors(a.from, a.endpoint, approach);
+          attacker.position.addScaledVector(a.direction, strike * (1 - recover) * 0.36);
           if (attacker.userData.arm)
-            attacker.userData.arm.rotation.x = -swing * (type === "b" || type === "q" ? 1.4 : 2.4);
-          attacker.userData.body.rotation.x = type === "n" ? swing * 0.4 : swing * 0.15;
+            attacker.userData.arm.rotation.x = magic
+              ? -swing * 1.2
+              : -windup * 2.3 + strike * 3.2 - recover * 0.9;
+          attacker.userData.body.rotation.x = type === "n"
+            ? -windup * 0.3 + strike * 0.45 - recover * 0.15
+            : -windup * 0.12 + strike * 0.25 - recover * 0.13;
           if (type === "r") {
-            attacker.userData.golem.visible = t > 0.15 && t < 0.86;
-            attacker.scale.y = 1 + swing * 0.5;
-            attacker.userData.golem.rotation.x = -swing * 1.5;
+            attacker.userData.golem.visible = t > 0.17 && t < 0.83;
+            attacker.scale.y = 1 + swing * 0.22;
+            attacker.userData.golem.rotation.x = -windup * 0.8 + strike * 1.5 - recover * 0.7;
           }
-          if (type === "q" || type === "b") {
+          if (magic) {
             attacker.position.y = 0.12 + swing * 0.16;
-            const pulse = Math.sin(action * Math.PI * 4) * 0.08;
-            a.victim.scale.setScalar(t < 0.53 ? 1 + pulse : Math.max(0.01, 1 - (t - 0.53) / 0.27));
+            impactLight.intensity = t < 0.48 ? windup * 3 : 0;
           }
-          if (t > 0.52) {
+          const guard = ramp(t, 0.23, 0.4) * (1 - ramp(t, 0.48, 0.6));
+          a.victim.userData.body.rotation.x = -guard * 0.16;
+          if (a.victim.userData.arm) a.victim.userData.arm.rotation.x = -guard * 0.65;
+          if (t >= 0.48) {
             if (!a.impacted) {
               a.onImpact();
               a.impacted = true;
             }
-            const defeat = Math.min(1, (t - 0.52) / 0.27);
-            a.victim.rotation.z = (defeat * Math.PI) / 2;
-            a.victim.position.y = 0.12 - defeat * 0.1;
-            if (!["q", "b"].includes(type)) a.victim.scale.setScalar(1 - defeat * 0.93);
-            a.victim.visible = t < 0.82;
+            const defeat = ramp(t, 0.48, 0.67);
+            a.victim.rotation.x = defeat * 1.25;
+            a.victim.position.copy(a.victimPosition).addScaledVector(a.direction, defeat * 0.28);
+            a.victim.scale.setScalar(Math.max(0.001, 1 - defeat));
+            a.victim.visible = t < 0.67;
+            const elapsed = (t - 0.48) * a.duration / 1000;
+            impactLight.intensity = Math.max(0, 18 * (1 - elapsed / 0.28));
+            for (const fragment of effects.children) {
+              fragment.visible = elapsed < 1.1;
+              fragment.position.copy(impactLight.position)
+                .addScaledVector(fragment.userData.velocity, elapsed);
+              fragment.position.y = Math.max(0.16, fragment.position.y - 3.2 * elapsed ** 2);
+              fragment.rotation.set(elapsed * 3, elapsed * 5, elapsed * 2);
+              fragment.scale.setScalar(1 - ramp(elapsed, 0.65, 1.1));
+            }
           }
-          if (t > 0.81) attacker.position.lerpVectors(endpoint, a.to, (t - 0.81) / 0.19);
+          const settle = ramp(t, 0.83, 1);
+          attacker.position.lerp(a.to, settle);
+          // Frame the two figures in profile, then return to the exact board view for input.
+          const focus = a.endpoint.clone().lerp(a.victimPosition, 0.5).add(v(0, 0.9, 0));
+          const side = v(-a.direction.z, 0, a.direction.x);
+          const closePosition = focus.clone().addScaledVector(side, 7)
+            .addScaledVector(a.direction, -2).add(v(0, 3.2, 0));
+          const zoom = ramp(t, 0.06, 0.22) * (1 - ramp(t, 0.8, 1));
+          camera.position.lerpVectors(a.cameraPosition, closePosition, zoom);
+          camera.lookAt(v(0, 0.1, 0).lerp(focus, zoom));
+          const width = THREE.MathUtils.lerp(a.halfWidth, 2.5, zoom);
+          const aspect = canvas.clientWidth / canvas.clientHeight;
+          camera.left = -width;
+          camera.right = width;
+          camera.top = width / aspect;
+          camera.bottom = -width / aspect;
+          camera.updateProjectionMatrix();
         } else {
           const smooth = t * t * (3 - 2 * t);
           attacker.position.lerpVectors(a.from, a.to, smooth);
@@ -363,9 +451,14 @@ export function createStage(canvas, onSquare) {
       }
       if (t === 1) {
         animation = null;
+        impactLight.intensity = 0;
+        disposeGroup(effects);
+        effects.clear();
+        resize();
         a.resolve();
       }
     }
+    renderedAt = now;
     renderer.render(scene, camera);
     dirty = false;
   }
@@ -375,6 +468,10 @@ export function createStage(canvas, onSquare) {
     sync,
     highlight,
     animateMove,
+    /** Ends the current cinematic on the next frame without applying the chess move again. */
+    skipBattle() {
+      if (animation?.cinematic) animation.start = performance.now() - animation.duration;
+    },
     flip() {
       flipped = !flipped;
       resize();

@@ -610,30 +610,53 @@ footer button {
 .battle-banner {
   position: absolute;
   left: 50%;
-  top: 50px;
+  top: 16px;
   transform: translateX(-50%);
   z-index: 5;
-  text-align: center;
+  text-align: left;
   pointer-events: none;
   background: #171e17e8;
   border: 1px solid #b59b5b;
-  padding: 10px 22px;
-  min-width: 250px;
+  padding: 10px 12px;
+  width: min(420px, calc(100% - 32px));
   box-shadow: 0 8px 40px #0008;
 }
+.battle-banner:not([hidden]) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  align-items: center;
+}
+.arena[data-phase="animating"] .arena-top,
+.arena[data-phase="animating"] .arena-bottom {
+  visibility: hidden;
+}
 .battle-banner small {
-  font-size: 7px;
-  letter-spacing: 4px;
-  color: #b79e66;
+  display: none;
 }
 .battle-banner strong {
-  font: 18px var(--serif);
+  font: 15px var(--serif);
   display: block;
   color: #f1dcaa;
-  margin: 6px 0;
+  margin: 0 0 5px;
 }
 .battle-banner > span {
+  grid-column: 1;
   font-size: 9px;
+  color: #aeb69d;
+}
+.battle-banner button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  padding: 12px;
+  pointer-events: auto;
+  font-size: 11px;
+  color: #f1dcaa;
+  border: 1px solid #b59b5b70;
+}
+.battle-banner kbd {
+  margin-left: 7px;
+  font: 9px Inter, sans-serif;
   color: #aeb69d;
 }
 dialog {
