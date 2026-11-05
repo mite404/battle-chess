@@ -293,7 +293,7 @@ function reset(fen, theatrePiece = null) {
   phase = "ready";
   $("#scene-caption").textContent = theatre
     ? "A private performance. Your move raises the curtain."
-    : "Every piece has a part to play.";
+    : "";
   refresh();
 }
 
