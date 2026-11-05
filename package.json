@@ -1,0 +1,19 @@
+{
+  "name": "battle-chess",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "verify": "node .agents/skills/verify-battle-chess/scripts/verify.mjs"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0",
+    "playwright": "^1.56.0"
+  }
+}

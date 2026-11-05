@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#181b1a" />
+    <title>Battle Chess | The king's theatre</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="masthead">
+        <a class="brand" href="/" aria-label="Battle Chess home"
+          ><span class="brand-mark">♜</span
+          ><span>BATTLE <b>CHESS</b><small>THE KING'S THEATRE</small></span></a
+        >
+        <nav aria-label="Main navigation">
+          <button class="nav-active" id="play-tab">The battlefield</button
+          ><button id="theatre">Battle theatre <span class="tiny">6</span></button
+          ><button id="how">How to play</button>
+        </nav>
+        <button class="sound icon-button" id="sound" aria-label="Mute sound" title="Toggle sound">
+          ♫ <span>Sound on</span>
+        </button>
+      </header>
+      <main>
+        <section class="game-column" aria-label="Battlefield">
+          <div class="scene-heading">
+            <span><i class="live-dot"></i> A GAME OF STRATEGY. A THEATRE OF WAR.</span
+            ><span class="edition">EST. 1988 <b>✦</b> REIMAGINED</span>
+          </div>
+          <div class="arena" id="arena">
+            <div class="arena-top">
+              <span class="engraving">THE ROYAL COURT</span
+              ><button id="flip" title="Rotate board" aria-label="Rotate board">
+                ⟳ <span>Rotate view</span>
+              </button>
+            </div>
+            <canvas id="board" aria-label="Interactive three-dimensional chessboard"></canvas>
+            <div id="squares" aria-label="Chessboard squares"></div>
+            <div class="battle-banner" id="battle-banner" hidden>
+              <small>THE BATTLE</small><strong id="battle-title"></strong
+              ><span id="battle-subtitle"></span>
+            </div>
+            <div class="arena-bottom">
+              <span id="scene-caption">Every piece has a part to play.</span
+              ><span class="view-tag">ISOMETRIC 3D <i></i></span>
+            </div>
+          </div>
+          <div class="command-bar">
+            <div class="turn-emblem" id="turn-icon">♔</div>
+            <div class="turn-copy">
+              <strong id="status">Your move, commander.</strong
+              ><span id="instruction">Select an ivory piece to see its legal moves.</span>
+            </div>
+            <button id="undo" class="tool-button" aria-label="Undo turn">↶ <span>Undo</span></button
+            ><button id="hint" class="tool-button" aria-label="Suggest a move">
+              ♧ <span>Hint</span></button
+            ><button id="new-game" class="gold-button">New game <span>+</span></button>
+          </div>
+          <div class="below-board">
+            <span
+              ><i class="key-dot"></i> SELECT A PIECE <span class="muted">/</span> CHOOSE YOUR
+              SQUARE</span
+            ><span>CLASSIC RULES. EXTRAORDINARY CONSEQUENCES.</span>
+          </div>
+        </section>
+        <aside class="match-panel">
+          <div class="panel-title">
+            <h1>The match</h1>
+            <span class="small-diamond">◆</span>
+          </div>
+          <div class="opponent-card">
+            <div class="crest red">♚</div>
+            <div>
+              <strong>The Crimson Court</strong><span id="opponent-label">Computer · Squire</span>
+            </div>
+            <span class="player-color">RED</span>
+          </div>
+          <div class="captured" id="captured-white"><span>No pieces captured</span></div>
+          <div class="versus"><span></span> VERSUS <span></span></div>
+          <div class="opponent-card">
+            <div class="crest ivory">♔</div>
+            <div>
+              <strong>The Ivory Kingdom</strong><span id="player-label">You · White pieces</span>
+            </div>
+            <span class="player-color">IVORY</span>
+          </div>
+          <div class="captured" id="captured-black"><span>No pieces captured</span></div>
+          <div class="match-settings">
+            <label
+              >Opponent<select id="mode">
+                <option value="ai">Computer</option>
+                <option value="local">Local two player</option>
+              </select></label
+            ><label
+              >Difficulty<select id="difficulty">
+                <option value="1">Squire</option>
+                <option value="2" selected>Knight</option>
+                <option value="3">Monarch</option>
+              </select></label
+            >
+          </div>
+          <div class="history-heading">
+            <h2>Chronicle</h2>
+            <span id="move-count">MOVE 01</span>
+          </div>
+          <div class="history" id="history">
+            <div class="empty-history">
+              <span>⚔</span>
+              <p>The story is yours to write.</p>
+              <small>Your moves will be recorded here.</small>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="legal-dot"></i> Legal move</span
+            ><span><i class="capture-dot"></i> Capture</span
+            ><span><i class="last-dot"></i> Last move</span>
+          </div>
+          <div class="quote">
+            <span>“</span>
+            <p>On this board, a sacrifice<br />is never just a metaphor.</p>
+            <small>LET THE BATTLE BEGIN</small>
+          </div>
+        </aside>
+      </main>
+      <footer>
+        <span
+          >♜ <b>BATTLE CHESS</b> <span class="footer-divider">/</span> An homage to a legendary
+          game.</span
+        ><span>32 CHARACTERS <b>✦</b> 64 SQUARES <b>✦</b> ONE CROWN</span
+        ><button id="settings">Game settings ⚙</button>
+      </footer>
+    </div>
+    <dialog id="modal">
+      <button id="close-modal" class="close" aria-label="Close dialog">×</button>
+      <div id="modal-body"></div>
+    </dialog>
+    <div id="toast" role="status" hidden></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
